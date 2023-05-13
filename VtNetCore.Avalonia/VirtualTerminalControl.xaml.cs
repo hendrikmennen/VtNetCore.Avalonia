@@ -474,6 +474,8 @@ namespace VtNetCore.Avalonia
 
         protected override void OnPointerPressed(PointerPressedEventArgs e)
         {
+            this.Focus();
+            
             var pointer = e.GetPosition(this);
             var position = ToPosition(pointer);
 
