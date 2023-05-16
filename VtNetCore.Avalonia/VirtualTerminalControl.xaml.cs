@@ -13,6 +13,7 @@ using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Avalonia.Input.Platform;
 using Avalonia.ReactiveUI;
 using VtNetCore.VirtualTerminal;
 using VtNetCore.VirtualTerminal.Model;
@@ -524,7 +525,7 @@ namespace VtNetCore.Avalonia
 
                     var captured = Terminal.GetText(TextSelection.Start.Column, TextSelection.Start.Row, TextSelection.End.Column, TextSelection.End.Row);
 
-                    Application.Current.Clipboard.SetTextAsync(captured).GetAwaiter().GetResult();
+                    TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(captured).GetAwaiter().GetResult();
                 }
                 else
                 {
@@ -978,11 +979,14 @@ namespace VtNetCore.Avalonia
 
         private async void PasteClipboard()
         {
-            string text = await Application.Current.Clipboard.GetTextAsync();
-
-            if (!string.IsNullOrEmpty(text))
+            if (TopLevel.GetTopLevel(this)?.Clipboard is IClipboard clipboard)
             {
-                PasteText(text);
+                string text = await clipboard.GetTextAsync();
+
+                if (!string.IsNullOrEmpty(text))
+                {
+                    PasteText(text);
+                }
             }
         }
     }
