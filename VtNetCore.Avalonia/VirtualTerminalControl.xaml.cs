@@ -28,15 +28,13 @@ namespace VtNetCore.Avalonia
         private int BlinkShowMs { get; set; } = 600;
         private int BlinkHideMs { get; set; } = 300;
 
-        private string InputBuffer { get; set; } = "";
+        readonly DispatcherTimer _blinkDispatcher;
 
-        DispatcherTimer blinkDispatcher;
-
-        ScrollBar scrollBar;
+        ScrollBar _scrollBar;
 
         // Use Euclid's algorithm to calculate the
         // greatest common divisor (GCD) of two numbers.
-        private long GCD(long a, long b)
+        private long Gcd(long a, long b)
         {
             a = Math.Abs(a);
             b = Math.Abs(b);
@@ -51,7 +49,7 @@ namespace VtNetCore.Avalonia
             };
         }
 
-        private static Color[] AttributeColors =
+        private static readonly Color[] AttributeColors =
         {
             Color.FromArgb(255,0,0,0),        // Black
             Color.FromArgb(255,205,0,0),      // Red
@@ -71,7 +69,7 @@ namespace VtNetCore.Avalonia
             Color.FromArgb(255,255,255,255),  // Bright white
         };
 
-        private static SolidColorBrush[] AttributeBrushes =
+        private static readonly SolidColorBrush[] AttributeBrushes =
         {
             new SolidColorBrush(AttributeColors[0]),
             new SolidColorBrush(AttributeColors[1]),
@@ -97,22 +95,21 @@ namespace VtNetCore.Avalonia
         public int Rows { get; private set; } = -1;
         public DataConsumer Consumer { get; set; }
 
-        private int viewTop = 0;
+        private int _viewTop = 0;
         public int ViewTop { 
-            get => viewTop; 
+            get => _viewTop; 
             set 
             {
-                viewTop = value;
-                if(scrollBar != null) scrollBar.Value = ViewTop;
+                _viewTop = value;
+                if(_scrollBar != null) _scrollBar.Value = ViewTop;
             }
         }
         public string WindowTitle { get; set; } = "Session";
-
         public bool ViewDebugging { get; set; }
         public bool DebugMouse { get; set; }
         public bool DebugSelect { get; set; }
 
-        private char[] _rawText = new char[0];
+        private char[] _rawText = Array.Empty<char>();
         private int _rawTextLength = 0;
         private string _rawTextString = "";
         private bool _rawTextChanged = false;
@@ -142,9 +139,9 @@ namespace VtNetCore.Avalonia
 
         public VirtualTerminalControl()
         {
-            blinkDispatcher = new DispatcherTimer();
-            blinkDispatcher.Tick += (sender, e) => InvalidateVisual();
-            blinkDispatcher.Interval = TimeSpan.FromMilliseconds(GCD(BlinkShowMs, BlinkHideMs));
+            _blinkDispatcher = new DispatcherTimer();
+            _blinkDispatcher.Tick += (sender, e) => InvalidateVisual();
+            _blinkDispatcher.Interval = TimeSpan.FromMilliseconds(Gcd(BlinkShowMs, BlinkHideMs));
             //blinkDispatcher.Start();
 
             this.GetObservable(TerminalProperty)
@@ -160,12 +157,11 @@ namespace VtNetCore.Avalonia
 
                     Columns = -1;
                     Rows = -1;
-                    InputBuffer = "";
                     TerminalIdleSince = DateTime.Now;
                     _rawTextChanged = false;
                     _rawTextString = "";
                     _rawTextLength = 0;
-                    _rawText = new char[0];
+                    _rawText = Array.Empty<char>();
                     ViewTop = 0;
                     CharacterHeight = -1;
                     CharacterWidth = -1;
@@ -213,9 +209,11 @@ namespace VtNetCore.Avalonia
         protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
         {
             base.OnApplyTemplate(e);
-            scrollBar = e.NameScope.Find<ScrollBar>("ScrollBar");
+            _scrollBar = e.NameScope.Find<ScrollBar>("PART_ScrollBar");
 
-            scrollBar.Scroll += (o, i) =>
+            if (_scrollBar == null) throw new NullReferenceException(nameof(_scrollBar));
+            
+            _scrollBar.Scroll += (o, i) =>
             {
                 SetScroll((int)i.NewValue);
             };
@@ -226,10 +224,10 @@ namespace VtNetCore.Avalonia
 
         private void SetScrollWindow()
         {
-            if (Terminal != null && scrollBar != null)
+            if (Terminal != null && _scrollBar != null)
             {
-                scrollBar.Maximum = Terminal.ViewPort.TopRow;
-                scrollBar.ViewportSize = Bounds.Height;
+                _scrollBar.Maximum = Terminal.ViewPort.TopRow;
+                _scrollBar.ViewportSize = Bounds.Height;
             }
         }
 
@@ -238,8 +236,8 @@ namespace VtNetCore.Avalonia
 
         public IConnection Connection
         {
-            get { return GetValue(ConnectionProperty); }
-            set { SetValue(ConnectionProperty, value); }
+            get => GetValue(ConnectionProperty);
+            set => SetValue(ConnectionProperty, value);
         }
 
         public static readonly StyledProperty<VirtualTerminalController> TerminalProperty =
@@ -373,7 +371,7 @@ namespace VtNetCore.Avalonia
             }
         }
 
-        protected void SetScroll(int value)
+        private void SetScroll(int value)
         {
             int oldViewTop = ViewTop;
 
@@ -423,10 +421,9 @@ namespace VtNetCore.Avalonia
 
             if (e.GetCurrentPoint(null).Properties.IsLeftButtonPressed)
             {
-                TextRange newSelection;
-
                 if (MousePressedAt != null && MousePressedAt != textPosition)
                 {
+                    TextRange newSelection;
                     if (MousePressedAt <= textPosition)
                     {
                         newSelection = new TextRange
@@ -444,7 +441,7 @@ namespace VtNetCore.Avalonia
                         };
                     }
 
-                    Selecting = true;
+                    _selecting = true;
 
                     if (TextSelection != newSelection)
                     {
@@ -514,10 +511,10 @@ namespace VtNetCore.Avalonia
 
             if (!e.GetCurrentPoint(null).Properties.IsLeftButtonPressed)
             {
-                if (Selecting)
+                if (_selecting)
                 {
                     MousePressedAt = null;
-                    Selecting = false;
+                    _selecting = false;
 
                     if (DebugSelect)
                         System.Diagnostics.Debug.WriteLine("Captured : " + Terminal.GetText(TextSelection.Start.Column, TextSelection.Start.Row, TextSelection.End.Column, TextSelection.End.Row));
@@ -653,7 +650,7 @@ namespace VtNetCore.Avalonia
             double lineY = 0;
             foreach (var textRow in spans)
             {
-                using (context.PushPreTransform(Matrix.CreateScale(
+                using (context.PushTransform(Matrix.CreateScale(
                         (textRow.DoubleWidth ? 2.0 : 1.0),  // Scale double width
                         (textRow.DoubleHeightBottom | textRow.DoubleHeightTop ? 2.0 : 1.0) // Scale double high
                     )))
@@ -697,7 +694,7 @@ namespace VtNetCore.Avalonia
             double lineY = 0;
             foreach (var textRow in spans)
             {
-                using (context.PushPreTransform(Matrix.CreateScale(
+                using (context.PushTransform(Matrix.CreateScale(
                         (textRow.DoubleWidth ? 2.0 : 1.0),  // Scale double width
                         (textRow.DoubleHeightBottom | textRow.DoubleHeightTop ? 2.0 : 1.0) // Scale double high
                     )))
@@ -751,7 +748,7 @@ namespace VtNetCore.Avalonia
             {
                 var textRow = spans[cursorY];
 
-                using (context.PushPreTransform(Matrix.CreateTranslation(
+                using (context.PushTransform(Matrix.CreateTranslation(
                         1.0f,
                         (textRow.DoubleHeightBottom ? -CharacterHeight : 0)
                     ) *
@@ -941,10 +938,9 @@ namespace VtNetCore.Avalonia
             Terminal?.ResizeView(Columns, Rows);
         }
 
-        TextPosition MouseOver { get; set; } = new TextPosition();
-
-        TextRange TextSelection { get; set; }
-        bool Selecting = false;
+        private TextPosition MouseOver { get; set; } = new TextPosition();
+        private TextRange TextSelection { get; set; }
+        private bool _selecting = false;
 
         private TextPosition ToPosition(Point point)
         {
@@ -959,7 +955,7 @@ namespace VtNetCore.Avalonia
             return new TextPosition { Column = overColumn, Row = overRow };
         }
 
-        public TextPosition MousePressedAt { get; set; }
+        private TextPosition MousePressedAt { get; set; }
 
         private void PasteText(string text)
         {
@@ -980,7 +976,7 @@ namespace VtNetCore.Avalonia
         {
             if (TopLevel.GetTopLevel(this)?.Clipboard is IClipboard clipboard)
             {
-                string text = await clipboard.GetTextAsync();
+                var text = await clipboard.GetTextAsync();
 
                 if (!string.IsNullOrEmpty(text))
                 {
