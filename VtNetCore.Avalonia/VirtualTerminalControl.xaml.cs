@@ -219,7 +219,8 @@ namespace VtNetCore.Avalonia
             };
 
             this.EffectiveViewportChanged += (o, i) => SetScrollWindow();
-            SetScrollWindow();
+            Observable.FromEventPattern<EventArgs>(this, nameof(EffectiveViewportChanged)).Take(1)
+                .Subscribe(x => SetScrollWindow());
         }
 
         private void SetScrollWindow()
@@ -228,6 +229,7 @@ namespace VtNetCore.Avalonia
             {
                 _scrollBar.Maximum = Terminal.ViewPort.TopRow;
                 _scrollBar.ViewportSize = Bounds.Height;
+                SetScroll(Terminal.ViewPort.TopRow);
             }
         }
 
