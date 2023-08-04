@@ -14,7 +14,7 @@
             <ControlTemplate>
               <Grid ColumnDefinitions="*, Auto">
                 <Panel />
-                <ScrollBar Grid.Column="1" Orientation="Vertical" Minimum="0" Name="PART_ScrollBar" Visibility="Visible"></ScrollBar>                    
+                <ScrollBar Grid.Column="1" Orientation="Vertical" Minimum="0" Name="PART_ScrollBar" Visibility="Visible" />
               </Grid>
             </ControlTemplate>
         </Setter>
