@@ -95,6 +95,10 @@ namespace VtNetCore.Avalonia
         public int Rows { get; private set; } = -1;
         public DataConsumer Consumer { get; set; }
 
+        private const double ScrollSpeedMultiplier = 2;
+        
+        private double _realScroll = 0;
+        
         private int _viewTop = 0;
         public int ViewTop { 
             get => _viewTop; 
@@ -369,7 +373,13 @@ namespace VtNetCore.Avalonia
             }
             else
             {               
-                SetScroll((int)(ViewTop - e.Delta.Y * 2));                
+                _realScroll += e.Delta.Y * ScrollSpeedMultiplier;
+
+                if (Math.Abs(_realScroll) > 1)
+                {
+                    SetScroll((int)(ViewTop - _realScroll));
+                    _realScroll = 0;
+                }
             }
         }
 
