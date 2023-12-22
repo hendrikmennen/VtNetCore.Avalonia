@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using Avalonia.Input.Platform;
@@ -311,6 +312,8 @@ namespace VtNetCore.Avalonia
             var controlPressed = e.KeyModifiers.HasFlag(KeyModifiers.Control);
             var shiftPressed = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
+            if(e.Key is Key.LeftCtrl || e.Key is Key.LeftShift) return;
+            
             if (controlPressed)
             {
                 switch (e.Key)
@@ -326,6 +329,15 @@ namespace VtNetCore.Avalonia
 
                     case Key.F12:
                         Terminal.Debugging = !Terminal.Debugging;
+                        return;
+                    
+                    case Key.V when shiftPressed:
+                        PasteClipboard();
+                        return;
+                    
+                    case Key.C when shiftPressed && _selecting:
+                        var captured = Terminal.GetText(TextSelection.Start.Column, TextSelection.Start.Row, TextSelection.End.Column, TextSelection.End.Row);
+                        TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(captured).GetAwaiter().GetResult();
                         return;
                 }
             }
