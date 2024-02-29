@@ -7,6 +7,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
@@ -587,7 +588,14 @@ namespace VtNetCore.Avalonia
             {
                 int oldTopRow = Terminal.ViewPort.TopRow;
 
-                Consumer.Push(e.Data);
+                try
+                {
+                    Consumer.Push(e.Data);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(ex);
+                }
 
                 if (Terminal.Changed)
                 {
