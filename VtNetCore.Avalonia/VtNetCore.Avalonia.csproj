@@ -1,25 +1,25 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-  </PropertyGroup>
-  
-  <ItemGroup>
-    <Compile Update="**\*.xaml.cs">
-      <DependentUpon>%(Filename)</DependentUpon>
-    </Compile>
-    <AvaloniaResource Include="**\*.xaml">
-      <SubType>Designer</SubType>
-    </AvaloniaResource>
-  </ItemGroup>
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.0.1" />
-    <PackageReference Include="Avalonia.ReactiveUI" Version="11.0.1" />
-  </ItemGroup>
+    <ItemGroup>
+        <Compile Update="**\*.xaml.cs">
+            <DependentUpon>%(Filename)</DependentUpon>
+        </Compile>
+        <AvaloniaResource Include="**\*.xaml">
+            <SubType>Designer</SubType>
+        </AvaloniaResource>
+    </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\VtNetCore\VtNetCore\VtNetCore.csproj" />
-  </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Avalonia" Version="11.0.1"/>
+        <PackageReference Include="Avalonia.ReactiveUI" Version="11.0.1"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\VtNetCore\VtNetCore\VtNetCore.csproj"/>
+    </ItemGroup>
 
 </Project>
