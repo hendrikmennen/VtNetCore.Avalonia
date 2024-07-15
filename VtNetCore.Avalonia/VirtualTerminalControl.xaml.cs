@@ -803,8 +803,9 @@ namespace VtNetCore.Avalonia
 
         public override void Render(DrawingContext context)
         {
-            var textFormat =
-                new Typeface(FontFamily, FontStyle, FontWeight);
+            var textFormat = new Typeface(FontFamily, FontStyle, FontWeight);
+
+            if (Bounds.Width <= 0 || Bounds.Height <= 0) return;
 
             ProcessTextFormat(context, textFormat);
 
@@ -928,11 +929,11 @@ namespace VtNetCore.Avalonia
                 CharacterHeight = textLayout.Height;
             }
 
-            var columns =
-                Convert.ToInt32(Math.Floor((Bounds.Size.Width - TextPadding.Left - TextPadding.Right) /
-                                           CharacterWidth));
+            var columns = Convert.ToInt32(Math.Floor((Bounds.Size.Width - TextPadding.Left - TextPadding.Right) /
+                                                     CharacterWidth));
             var rows = Convert.ToInt32(Math.Floor((Bounds.Size.Height - TextPadding.Top - TextPadding.Bottom) /
                                                   CharacterHeight));
+            
             if (Columns != columns || Rows != rows)
             {
                 Columns = columns;
@@ -940,7 +941,10 @@ namespace VtNetCore.Avalonia
                 ResizeTerminal();
 
                 if (Connection != null)
+                {
                     Connection.SetTerminalWindowSize(columns, rows, (int)Bounds.Width, (int)Bounds.Height);
+                    Console.WriteLine(columns + " " + rows + " ");
+                }
             }
         }
 
