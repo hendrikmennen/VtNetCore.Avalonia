@@ -207,7 +207,7 @@ namespace VtNetCore.Avalonia
                         .ObserveOn(AvaloniaScheduler.Instance)
                         .Subscribe(args => OnDataReceived(args.EventArgs)));
 
-                    connection.SetTerminalWindowSize(Columns, Rows, 800, 600);
+                    //connection.SetTerminalWindowSize(Columns, Rows, 800, 600);
                 }
             });
         }
