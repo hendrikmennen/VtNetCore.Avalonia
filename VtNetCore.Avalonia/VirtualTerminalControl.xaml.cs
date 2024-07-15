@@ -943,7 +943,6 @@ namespace VtNetCore.Avalonia
                 if (Connection != null)
                 {
                     Connection.SetTerminalWindowSize(columns, rows, (int)Bounds.Width, (int)Bounds.Height);
-                    Console.WriteLine(columns + " " + rows + " ");
                 }
             }
         }
