@@ -26,6 +26,6 @@ namespace VtNetCore.Avalonia
 
         void SendData(byte[] data);
 
-        void SetTerminalWindowSize(int columns, int rows, int width, int height);
+        void SetTerminalWindowSize(int columns, int rows);
     }
 }
