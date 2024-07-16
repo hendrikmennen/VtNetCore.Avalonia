@@ -78,11 +78,6 @@ namespace VtNetCore.Avalonia
         private readonly DispatcherTimer _blinkDispatcher;
         private CompositeDisposable _disposables;
 
-        private char[] _rawText = Array.Empty<char>();
-        private bool _rawTextChanged;
-        private int _rawTextLength;
-        private string _rawTextString = "";
-
         private double _realScroll;
 
         private ScrollBar _scrollBar;
@@ -118,10 +113,6 @@ namespace VtNetCore.Avalonia
                     Columns = -1;
                     Rows = -1;
                     TerminalIdleSince = DateTime.Now;
-                    _rawTextChanged = false;
-                    _rawTextString = "";
-                    _rawTextLength = 0;
-                    _rawText = Array.Empty<char>();
                     ViewTop = 0;
                     CharacterHeight = -1;
                     CharacterWidth = -1;
@@ -189,21 +180,6 @@ namespace VtNetCore.Avalonia
         public bool DebugMouse { get; set; }
         public bool DebugSelect { get; set; }
 
-        public string RawText
-        {
-            get
-            {
-                if (_rawTextChanged)
-                    lock (_rawText)
-                    {
-                        _rawTextString = new string(_rawText, 0, _rawTextLength);
-                        _rawTextChanged = false;
-                    }
-
-                return _rawTextString;
-            }
-        }
-
         public IConnection Connection
         {
             get => GetValue(ConnectionProperty);
@@ -266,8 +242,9 @@ namespace VtNetCore.Avalonia
         {
             if (Terminal != null && _scrollBar != null)
             {
-                _scrollBar.Maximum = Terminal.ViewPort.TopRow;
-                _scrollBar.ViewportSize = Bounds.Height;
+                _scrollBar.Minimum = 0;
+                _scrollBar.Maximum = Terminal.ViewPort.Parent.BottomRow - Rows;
+                _scrollBar.ViewportSize = Rows;
                 SetScroll(Terminal.ViewPort.TopRow);
             }
         }
@@ -325,16 +302,16 @@ namespace VtNetCore.Avalonia
                 switch (e.Key)
                 {
                     case Key.F10:
-                        Consumer.SequenceDebugging = !Consumer.SequenceDebugging;
+                        //Consumer.SequenceDebugging = !Consumer.SequenceDebugging;
                         return;
 
                     case Key.F11:
-                        ViewDebugging = !ViewDebugging;
+                        //ViewDebugging = !ViewDebugging;
                         InvalidateVisual();
                         return;
 
                     case Key.F12:
-                        Terminal.Debugging = !Terminal.Debugging;
+                        //Terminal.Debugging = !Terminal.Debugging;
                         return;
 
                     case Key.V when shiftPressed:
@@ -404,7 +381,7 @@ namespace VtNetCore.Avalonia
         private void SetScroll(int value)
         {
             var oldViewTop = ViewTop;
-
+            
             ViewTop = value;
 
             if (ViewTop < 0)
@@ -613,17 +590,6 @@ namespace VtNetCore.Avalonia
         private void ProcessRawText()
         {
             var incoming = Terminal.RawText;
-
-            lock (_rawText)
-            {
-                if (_rawTextLength + incoming.Length > _rawText.Length)
-                    Array.Resize(ref _rawText, _rawText.Length + 1000000);
-
-                for (var i = 0; i < incoming.Length; i++)
-                    _rawText[_rawTextLength++] = incoming[i];
-
-                _rawTextChanged = true;
-            }
 
             SetScrollWindow();
         }
