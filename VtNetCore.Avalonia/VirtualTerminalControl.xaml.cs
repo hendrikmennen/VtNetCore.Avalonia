@@ -223,8 +223,12 @@ namespace VtNetCore.Avalonia
                 a = b;
                 b = remainder;
             }
+        }
 
-            ;
+        protected override void OnMeasureInvalidated()
+        {
+            base.OnMeasureInvalidated();
+            SetScrollWindow();
         }
 
         protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
@@ -235,10 +239,6 @@ namespace VtNetCore.Avalonia
             if (_scrollBar == null) throw new NullReferenceException(nameof(_scrollBar));
 
             _scrollBar.Scroll += (o, i) => { SetScroll((int)i.NewValue); };
-
-            EffectiveViewportChanged += (o, i) => SetScrollWindow();
-            Observable.FromEventPattern<EventArgs>(this, nameof(EffectiveViewportChanged)).Take(1)
-                .Subscribe(x => SetScrollWindow());
         }
 
         private void SetScrollWindow()
@@ -577,24 +577,17 @@ namespace VtNetCore.Avalonia
 
                 if (Terminal.Changed)
                 {
-                    ProcessRawText();
                     Terminal.ClearChanges();
 
                     if (oldTopRow != Terminal.ViewPort.TopRow && oldTopRow >= ViewTop)
                         ViewTop = Terminal.ViewPort.TopRow;
 
+                    SetScrollWindow();
                     InvalidateVisual();
                 }
 
                 TerminalIdleSince = DateTime.Now;
             }
-        }
-
-        private void ProcessRawText()
-        {
-            var incoming = Terminal.RawText;
-
-            SetScrollWindow();
         }
 
         private bool BlinkVisible()
@@ -913,6 +906,8 @@ namespace VtNetCore.Avalonia
                 {
                     Connection.SetTerminalWindowSize(columns, rows);
                 }
+                
+                Dispatcher.UIThread.Post(InvalidateMeasure);
             }
         }
 
