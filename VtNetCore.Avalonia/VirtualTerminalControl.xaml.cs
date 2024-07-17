@@ -153,8 +153,6 @@ namespace VtNetCore.Avalonia
                             .FromEventPattern<DataReceivedEventArgs>(connection, nameof(connection.DataReceived))
                             .ObserveOn(AvaloniaScheduler.Instance)
                             .Subscribe(args => OnDataReceived(args.EventArgs)));
-
-                        connection.SetTerminalWindowSize(Columns, Rows);
                     }
                 });
         }
