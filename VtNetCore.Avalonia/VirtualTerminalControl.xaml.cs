@@ -148,11 +148,14 @@ namespace VtNetCore.Avalonia
                     _disposables = new CompositeDisposable();
 
                     if (connection != null)
+                    {
                         _disposables.Add(Observable
                             .FromEventPattern<DataReceivedEventArgs>(connection, nameof(connection.DataReceived))
                             .ObserveOn(AvaloniaScheduler.Instance)
                             .Subscribe(args => OnDataReceived(args.EventArgs)));
-                    //connection.SetTerminalWindowSize(Columns, Rows, 800, 600);
+
+                        connection.SetTerminalWindowSize(Columns, Rows);
+                    }
                 });
         }
 
