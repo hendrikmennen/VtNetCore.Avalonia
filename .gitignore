@@ -238,3 +238,5 @@ $RECYCLE.BIN/
 /AvalonStudio/AvalonStudio.Languages.CPlusPlus/NativeBinaries
 /SampleLLilumProject/temp.ZeligImage
 /SampleLLilumProject/LLilum/temp.ZeligImage
+
+.avalonia-build-tasks
