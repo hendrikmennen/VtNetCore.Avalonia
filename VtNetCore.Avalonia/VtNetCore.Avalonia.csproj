@@ -15,7 +15,7 @@
 
     <ItemGroup>
         <PackageReference Include="Avalonia" Version="11.3.9"/>
-        <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.9/>
+        <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.9"/>
     </ItemGroup>
 
     <ItemGroup>
