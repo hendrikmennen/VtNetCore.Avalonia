@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using Avalonia;
@@ -317,12 +318,14 @@ namespace VtNetCore.Avalonia
 
                     case Key.V when shiftPressed:
                         PasteClipboard();
+                        e.Handled = true;
                         return;
 
-                    case Key.C when shiftPressed && _selecting:
+                    case Key.C when shiftPressed && TextSelection != null:
                         var captured = Terminal.GetText(TextSelection.Start.Column, TextSelection.Start.Row,
                             TextSelection.End.Column, TextSelection.End.Row);
-                        TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(captured).GetAwaiter().GetResult();
+                        _ = TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(captured);
+                        e.Handled = true;
                         return;
                 }
 
@@ -341,8 +344,6 @@ namespace VtNetCore.Avalonia
 
         protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
         {
-            var pointer = e.GetPosition(this);
-
             var controlPressed = e.KeyModifiers.HasFlag(KeyModifiers.Control);
 
             if (controlPressed)
@@ -399,12 +400,10 @@ namespace VtNetCore.Avalonia
             if (!(e.Source is VirtualTerminalControl)) return;
 
             var pointer = e.GetPosition(this);
-            var position = ToPosition(pointer);
+            var hasPosition = TryGetCellPosition(pointer, out var position, clampToBounds: false);
+            var hasSelectionPosition = TryGetCellPosition(pointer, out var selectionPosition, clampToBounds: true);
 
-            var textPosition = position.OffsetBy(0, ViewTop);
-
-            if (Connected && (Terminal.UseAllMouseTracking || Terminal.CellMotionMouseTracking) &&
-                position.Column >= 0 && position.Row >= 0 && position.Column < Columns && position.Row < Rows)
+            if (Connected && hasPosition && (Terminal.UseAllMouseTracking || Terminal.CellMotionMouseTracking))
             {
                 var controlPressed = e.KeyModifiers.HasFlag(KeyModifiers.Control);
                 var shiftPressed = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
@@ -423,10 +422,15 @@ namespace VtNetCore.Avalonia
                     return;
             }
 
-            if (MouseOver != null && MouseOver == position)
+            if (!hasSelectionPosition)
                 return;
 
-            MouseOver = position;
+            var textPosition = selectionPosition.OffsetBy(0, ViewTop);
+
+            if (MouseOver != null && MouseOver == selectionPosition)
+                return;
+
+            MouseOver = selectionPosition;
 
             if (e.GetCurrentPoint(null).Properties.IsLeftButtonPressed)
                 if (MousePressedAt != null && MousePressedAt != textPosition)
@@ -436,7 +440,7 @@ namespace VtNetCore.Avalonia
                         newSelection = new TextRange
                         {
                             Start = MousePressedAt,
-                            End = textPosition.OffsetBy(-1, 0)
+                            End = textPosition
                         };
                     else
                         newSelection = new TextRange
@@ -477,22 +481,27 @@ namespace VtNetCore.Avalonia
             Focus();
 
             var pointer = e.GetPosition(this);
-            var position = ToPosition(pointer);
+            if (!TryGetCellPosition(pointer, out var position, clampToBounds: true))
+                return;
 
             var textPosition = position.OffsetBy(0, ViewTop);
+            _selecting = false;
 
             if (!Connected || (Connected && !Terminal.X10SendMouseXYOnButton && !Terminal.X11SendMouseXYOnButton &&
                                !Terminal.SgrMouseMode && !Terminal.CellMotionMouseTracking &&
                                !Terminal.UseAllMouseTracking))
             {
                 if (e.GetCurrentPoint(null).Properties.IsLeftButtonPressed)
+                {
+                    TextSelection = null;
                     MousePressedAt = textPosition;
+                    e.Pointer.Capture(this);
+                }
                 else if (e.GetCurrentPoint(null).Properties.IsRightButtonPressed)
                     PasteClipboard();
             }
 
-            if (Connected && position.Column >= 0 && position.Row >= 0 && position.Column < Columns &&
-                position.Row < Rows)
+            if (Connected)
             {
                 var controlPressed = e.KeyModifiers.HasFlag(KeyModifiers.Control);
                 var shiftPressed = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
@@ -512,12 +521,16 @@ namespace VtNetCore.Avalonia
         protected override void OnPointerReleased(PointerReleasedEventArgs e)
         {
             var pointer = e.GetPosition(this);
-            var position = ToPosition(pointer);
+            if (!TryGetCellPosition(pointer, out var position, clampToBounds: true))
+                return;
+
             var textPosition = position.OffsetBy(0, ViewTop);
 
             if (!e.GetCurrentPoint(null).Properties.IsLeftButtonPressed)
             {
-                if (_selecting)
+                e.Pointer.Capture(null);
+
+                if (_selecting && TextSelection != null)
                 {
                     MousePressedAt = null;
                     _selecting = false;
@@ -529,7 +542,7 @@ namespace VtNetCore.Avalonia
                     var captured = Terminal.GetText(TextSelection.Start.Column, TextSelection.Start.Row,
                         TextSelection.End.Column, TextSelection.End.Row);
 
-                    TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(captured).GetAwaiter().GetResult();
+                    _ = TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(captured);
                 }
                 else
                 {
@@ -538,8 +551,7 @@ namespace VtNetCore.Avalonia
                 }
             }
 
-            if (Connected && position.Column >= 0 && position.Row >= 0 && position.Column < Columns &&
-                position.Row < Rows)
+            if (Connected)
             {
                 var controlPressed = e.KeyModifiers.HasFlag(KeyModifiers.Control);
                 var shiftPressed = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
@@ -592,7 +604,7 @@ namespace VtNetCore.Avalonia
         {
             var blinkCycle = BlinkShowMs + BlinkHideMs;
 
-            return DateTime.Now.Subtract(DateTime.MinValue).Milliseconds % blinkCycle < BlinkHideMs;
+            return DateTime.Now.Subtract(DateTime.MinValue).TotalMilliseconds % blinkCycle < BlinkHideMs;
         }
 
         public IBrush GetSolidColorBrush(string hex)
@@ -916,21 +928,44 @@ namespace VtNetCore.Avalonia
 
         private TextPosition ToPosition(Point point)
         {
-            var overColumn = (int)Math.Floor(point.X / CharacterWidth);
-            if (overColumn >= Columns)
-                overColumn = Columns - 1;
+            TryGetCellPosition(point, out var position, clampToBounds: true);
+            return position;
+        }
 
-            var overRow = (int)Math.Floor(point.Y / CharacterHeight);
-            if (overRow >= Rows)
-                overRow = Rows - 1;
+        private bool TryGetCellPosition(Point point, out TextPosition position, bool clampToBounds)
+        {
+            position = new TextPosition(-1, -1);
 
-            return new TextPosition { Column = overColumn, Row = overRow };
+            if (Columns <= 0 || Rows <= 0 || CharacterWidth <= 0 || CharacterHeight <= 0)
+                return false;
+
+            var x = point.X - TextPadding.Left;
+            var y = point.Y - TextPadding.Top;
+
+            if (!clampToBounds &&
+                (x < 0 || y < 0 || x >= Columns * CharacterWidth || y >= Rows * CharacterHeight))
+                return false;
+
+            var overColumn = (int)Math.Floor(x / CharacterWidth);
+            var overRow = (int)Math.Floor(y / CharacterHeight);
+
+            if (overColumn < 0) overColumn = 0;
+            if (overColumn >= Columns) overColumn = Columns - 1;
+
+            if (overRow < 0) overRow = 0;
+            if (overRow >= Rows) overRow = Rows - 1;
+
+            position = new TextPosition { Column = overColumn, Row = overRow };
+            return true;
         }
 
         private void PasteText(string text)
         {
             if (Connection == null)
                 return;
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                text = text.Replace("\r\n", "\r").Replace("\n", "\r");
 
             var buffer = Encoding.UTF8.GetBytes(text);
 
