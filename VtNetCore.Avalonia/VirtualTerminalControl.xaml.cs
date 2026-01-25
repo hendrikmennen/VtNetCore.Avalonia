@@ -81,12 +81,22 @@ namespace VtNetCore.Avalonia
 
         private double _realScroll;
 
+        private readonly StringBuilder _commandBuffer = new StringBuilder();
+
         private ScrollBar _scrollBar;
         private bool _selecting;
         private CompositeDisposable _terminalDisposables;
 
         private int _viewTop;
         public DateTime TerminalIdleSince = DateTime.Now;
+
+        private static readonly HashSet<string> ClearCommands =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "cls",
+                "clear",
+                "clear-host"
+            };
 
         static VirtualTerminalControl()
         {
@@ -287,7 +297,10 @@ namespace VtNetCore.Avalonia
             // I lookup whether KeyPressed should handle the key here or there.
             var code = Terminal.GetKeySequence(ch, false, false);
             if (code == null)
+            {
+                AppendCommandText(ch);
                 e.Handled = Terminal.KeyPressed(ch, false, false);
+            }
         }
 
         protected override void OnKeyDown(KeyEventArgs e)
@@ -299,6 +312,14 @@ namespace VtNetCore.Avalonia
             var shiftPressed = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
             if (e.Key is Key.LeftCtrl || e.Key is Key.LeftShift) return;
+
+            if (!controlPressed)
+            {
+                if (e.Key == Key.Back)
+                    HandleCommandBackspace();
+                else if (e.Key == Key.Enter)
+                    HandleCommandEnter();
+            }
 
             if (controlPressed)
                 switch (e.Key)
@@ -972,6 +993,7 @@ namespace VtNetCore.Avalonia
             var connection = Connection;
 
             Task.Run(() => { connection.SendData(buffer); });
+            AppendCommandText(text);
         }
 
         private async void PasteClipboard()
@@ -982,6 +1004,60 @@ namespace VtNetCore.Avalonia
 
                 if (!string.IsNullOrEmpty(text)) PasteText(text);
             }
+        }
+
+        private void AppendCommandText(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return;
+
+            foreach (var ch in text)
+            {
+                if (ch == '\r' || ch == '\n')
+                {
+                    HandleCommandEnter();
+                    continue;
+                }
+
+                if (!char.IsControl(ch))
+                    _commandBuffer.Append(ch);
+            }
+        }
+
+        private void HandleCommandBackspace()
+        {
+            if (_commandBuffer.Length == 0)
+                return;
+
+            _commandBuffer.Length -= 1;
+        }
+
+        private void HandleCommandEnter()
+        {
+            var command = _commandBuffer.ToString().Trim();
+            _commandBuffer.Clear();
+
+            if (string.IsNullOrEmpty(command))
+                return;
+
+            if (command.EndsWith(";", StringComparison.Ordinal))
+                command = command.TrimEnd(';').TrimEnd();
+
+            if (!ClearCommands.Contains(command))
+                return;
+
+            if (Terminal == null)
+                return;
+
+            lock (Terminal)
+            {
+                Terminal.EraseAll();
+                Terminal.SetCursorPosition(1, 1);
+            }
+
+            ViewTop = Terminal.ViewPort.TopRow;
+            SetScrollWindow();
+            InvalidateVisual();
         }
     }
 }
