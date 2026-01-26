@@ -76,20 +76,6 @@ namespace VtNetCore.Avalonia
         public static readonly AvaloniaProperty<Thickness> TextPaddingProperty =
             AvaloniaProperty.Register<VirtualTerminalControl, Thickness>(nameof(TextPadding));
 
-        private readonly DispatcherTimer _blinkDispatcher;
-        private CompositeDisposable _disposables;
-
-        private double _realScroll;
-
-        private readonly StringBuilder _commandBuffer = new StringBuilder();
-
-        private ScrollBar _scrollBar;
-        private bool _selecting;
-        private CompositeDisposable _terminalDisposables;
-
-        private int _viewTop;
-        public DateTime TerminalIdleSince = DateTime.Now;
-
         private static readonly HashSet<string> ClearCommands =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -97,6 +83,20 @@ namespace VtNetCore.Avalonia
                 "clear",
                 "clear-host"
             };
+
+        private readonly DispatcherTimer _blinkDispatcher;
+
+        private readonly StringBuilder _commandBuffer = new StringBuilder();
+        private CompositeDisposable _disposables;
+
+        private double _realScroll;
+
+        private ScrollBar _scrollBar;
+        private bool _selecting;
+        private CompositeDisposable _terminalDisposables;
+
+        private int _viewTop;
+        public DateTime TerminalIdleSince = DateTime.Now;
 
         static VirtualTerminalControl()
         {
@@ -159,12 +159,10 @@ namespace VtNetCore.Avalonia
                     _disposables = new CompositeDisposable();
 
                     if (connection != null)
-                    {
                         _disposables.Add(Observable
                             .FromEventPattern<DataReceivedEventArgs>(connection, nameof(connection.DataReceived))
                             .ObserveOn(AvaloniaScheduler.Instance)
                             .Subscribe(args => OnDataReceived(args.EventArgs)));
-                    }
                 });
         }
 
@@ -404,7 +402,7 @@ namespace VtNetCore.Avalonia
         private void SetScroll(int value)
         {
             var oldViewTop = ViewTop;
-            
+
             ViewTop = value;
 
             if (ViewTop < 0)
@@ -421,8 +419,8 @@ namespace VtNetCore.Avalonia
             if (!(e.Source is VirtualTerminalControl)) return;
 
             var pointer = e.GetPosition(this);
-            var hasPosition = TryGetCellPosition(pointer, out var position, clampToBounds: false);
-            var hasSelectionPosition = TryGetCellPosition(pointer, out var selectionPosition, clampToBounds: true);
+            var hasPosition = TryGetCellPosition(pointer, out var position, false);
+            var hasSelectionPosition = TryGetCellPosition(pointer, out var selectionPosition, true);
 
             if (Connected && hasPosition && (Terminal.UseAllMouseTracking || Terminal.CellMotionMouseTracking))
             {
@@ -502,7 +500,7 @@ namespace VtNetCore.Avalonia
             Focus();
 
             var pointer = e.GetPosition(this);
-            if (!TryGetCellPosition(pointer, out var position, clampToBounds: true))
+            if (!TryGetCellPosition(pointer, out var position, true))
                 return;
 
             var textPosition = position.OffsetBy(0, ViewTop);
@@ -519,7 +517,9 @@ namespace VtNetCore.Avalonia
                     e.Pointer.Capture(this);
                 }
                 else if (e.GetCurrentPoint(null).Properties.IsRightButtonPressed)
+                {
                     PasteClipboard();
+                }
             }
 
             if (Connected)
@@ -542,7 +542,7 @@ namespace VtNetCore.Avalonia
         protected override void OnPointerReleased(PointerReleasedEventArgs e)
         {
             var pointer = e.GetPosition(this);
-            if (!TryGetCellPosition(pointer, out var position, clampToBounds: true))
+            if (!TryGetCellPosition(pointer, out var position, true))
                 return;
 
             var textPosition = position.OffsetBy(0, ViewTop);
@@ -926,18 +926,15 @@ namespace VtNetCore.Avalonia
                                                      CharacterWidth));
             var rows = Convert.ToInt32(Math.Floor((Bounds.Size.Height - TextPadding.Top - TextPadding.Bottom) /
                                                   CharacterHeight));
-            
+
             if (Columns != columns || Rows != rows)
             {
                 Columns = columns;
                 Rows = rows;
                 ResizeTerminal();
 
-                if (Connection != null)
-                {
-                    Connection.SetTerminalWindowSize(columns, rows);
-                }
-                
+                if (Connection != null) Connection.SetTerminalWindowSize(columns, rows);
+
                 Dispatcher.UIThread.Post(InvalidateMeasure);
             }
         }
@@ -949,7 +946,7 @@ namespace VtNetCore.Avalonia
 
         private TextPosition ToPosition(Point point)
         {
-            TryGetCellPosition(point, out var position, clampToBounds: true);
+            TryGetCellPosition(point, out var position, true);
             return position;
         }
 
