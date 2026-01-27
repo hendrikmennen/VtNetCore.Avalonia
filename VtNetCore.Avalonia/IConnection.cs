@@ -28,4 +28,14 @@ namespace VtNetCore.Avalonia
 
         void SetTerminalWindowSize(int columns, int rows);
     }
+
+    public interface IOutputFilter
+    {
+        byte[] FilterOutput(byte[] data);
+    }
+
+    public interface IOutputSuppressor
+    {
+        void SuppressOutput(byte[] sequence);
+    }
 }
