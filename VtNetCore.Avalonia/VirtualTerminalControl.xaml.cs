@@ -27,7 +27,6 @@ namespace VtNetCore.Avalonia
     public class VirtualTerminalControl : TemplatedControl
     {
         private const double ScrollSpeedMultiplier = 2;
-        private static readonly byte[] OwDoneMarkerBytes = Encoding.ASCII.GetBytes("OW_DONE:");
 
         private static readonly Color[] AttributeColors =
         {
@@ -98,9 +97,6 @@ namespace VtNetCore.Avalonia
         private CompositeDisposable _terminalDisposables;
 
         private int _viewTop;
-        private bool _oscPending;
-        private bool _pendingEsc;
-        private List<byte> _oscBuffer;
         public DateTime TerminalIdleSince = DateTime.Now;
 
         static VirtualTerminalControl()
@@ -661,9 +657,8 @@ namespace VtNetCore.Avalonia
                         data = filter.FilterOutput(data);
                     }
 
-                    var filtered = FilterOwMarkers(data);
-                    if (filtered.Length == 0) return;
-                    Consumer.Push(filtered);
+                    if (data.Length == 0) return;
+                    Consumer.Push(data);
                 }
                 catch (Exception ex)
                 {
@@ -683,118 +678,6 @@ namespace VtNetCore.Avalonia
 
                 TerminalIdleSince = DateTime.Now;
             }
-        }
-
-        private byte[] FilterOwMarkers(byte[] data)
-        {
-            if (data.Length == 0) return data;
-
-            var output = new List<byte>(data.Length + 8);
-            var i = 0;
-
-            if (_pendingEsc)
-            {
-                if (data[0] == (byte)']')
-                {
-                    StartOsc();
-                    i = 1;
-                }
-                else
-                {
-                    output.Add(0x1b);
-                }
-
-                _pendingEsc = false;
-            }
-
-            for (; i < data.Length; i++)
-            {
-                var b = data[i];
-
-                if (_oscPending)
-                {
-                    _oscBuffer.Add(b);
-
-                    if (b == 0x07)
-                    {
-                        EndOsc(output);
-                    }
-                    else if (b == 0x1b && i + 1 < data.Length && data[i + 1] == (byte)'\\')
-                    {
-                        _oscBuffer.Add(data[++i]);
-                        EndOsc(output);
-                    }
-
-                    continue;
-                }
-
-                if (b == 0x1b)
-                {
-                    if (i == data.Length - 1)
-                    {
-                        _pendingEsc = true;
-                        break;
-                    }
-
-                    if (data[i + 1] == (byte)']')
-                    {
-                        StartOsc();
-                        i++;
-                        continue;
-                    }
-                }
-
-                output.Add(b);
-            }
-
-            if (_oscPending || _pendingEsc) return output.ToArray();
-
-            return output.Count == data.Length ? data : output.ToArray();
-        }
-
-        private void StartOsc()
-        {
-            _oscPending = true;
-            _oscBuffer = new List<byte> { 0x1b, (byte)']' };
-        }
-
-        private void EndOsc(List<byte> output)
-        {
-            if (_oscBuffer == null)
-            {
-                _oscPending = false;
-                return;
-            }
-
-            if (!ContainsOwMarker(_oscBuffer, 2, _oscBuffer.Count))
-            {
-                output.AddRange(_oscBuffer);
-            }
-
-            _oscBuffer = null;
-            _oscPending = false;
-        }
-
-        private static bool ContainsOwMarker(List<byte> buffer, int start, int end)
-        {
-            if (end - start < OwDoneMarkerBytes.Length) return false;
-
-            for (var i = start; i <= end - OwDoneMarkerBytes.Length; i++)
-            {
-                var match = true;
-                for (var j = 0; j < OwDoneMarkerBytes.Length; j++)
-                {
-                    if (buffer[i + j] != OwDoneMarkerBytes[j])
-                    {
-                        match = false;
-                        break;
-                    }
-                }
-
-                if (match) return true;
-            }
-
-            return false;
         }
 
         private bool BlinkVisible()
