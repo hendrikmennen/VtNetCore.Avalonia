@@ -14,9 +14,7 @@ using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Media;
-using Avalonia.ReactiveUI;
 using Avalonia.Threading;
-using ReactiveUI;
 using VtNetCore.VirtualTerminal;
 using VtNetCore.VirtualTerminal.Layout;
 using VtNetCore.VirtualTerminal.Model;
@@ -112,7 +110,7 @@ namespace VtNetCore.Avalonia
             //blinkDispatcher.Start();
             
             this.GetObservable(TerminalProperty)
-                .ObserveOn(AvaloniaScheduler.Instance)
+                .ObserveOn(UiScheduler.Instance)
                 .Subscribe(terminal =>
                 {
                     if (_terminalDisposables != null)
@@ -140,7 +138,7 @@ namespace VtNetCore.Avalonia
 
                         _terminalDisposables.Add(
                             Observable.FromEventPattern<TextEventArgs>(terminal, nameof(terminal.WindowTitleChanged))
-                                .ObserveOn(AvaloniaScheduler.Instance)
+                                .ObserveOn(UiScheduler.Instance)
                                 .Subscribe(e => WindowTitle = e.EventArgs.Text));
 
                         terminal.StoreRawText = true;
@@ -148,7 +146,7 @@ namespace VtNetCore.Avalonia
                 });
 
             this.GetObservable(ConnectionProperty)
-                .ObserveOn(AvaloniaScheduler.Instance)
+                .ObserveOn(UiScheduler.Instance)
                 .Subscribe(connection =>
                 {
                     if (_disposables != null)
@@ -162,7 +160,7 @@ namespace VtNetCore.Avalonia
                     if (connection != null)
                         _disposables.Add(Observable
                             .FromEventPattern<DataReceivedEventArgs>(connection, nameof(connection.DataReceived))
-                            .ObserveOn(AvaloniaScheduler.Instance)
+                            .ObserveOn(UiScheduler.Instance)
                             .Subscribe(args => OnDataReceived(args.EventArgs)));
                 });
         }
@@ -611,19 +609,15 @@ namespace VtNetCore.Avalonia
             var copyMenuItem = new MenuItem
             {
                 Header = "Copy",
-                Command = ReactiveCommand.CreateFromTask(
-                    CopySelectionToClipboardAsync,
-                    outputScheduler: AvaloniaScheduler.Instance),
                 IsEnabled = TextSelection != null
             };
+            copyMenuItem.Click += async (_, _) => await CopySelectionToClipboardAsync();
             
             var pasteMenuItem = new MenuItem
             {
-                Header = "Paste",
-                Command = ReactiveCommand.Create(
-                    PasteClipboard,
-                    outputScheduler: AvaloniaScheduler.Instance),
+                Header = "Paste"
             };
+            pasteMenuItem.Click += (_, _) => PasteClipboard();
             
             ContextMenu.Items.Add(copyMenuItem);
             ContextMenu.Items.Add(pasteMenuItem);
